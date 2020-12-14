@@ -3,9 +3,10 @@ package com.amazonaws.iot.securityprofile;
 import software.amazon.awssdk.services.iot.IotClient;
 import software.amazon.awssdk.services.iot.model.DeleteSecurityProfileRequest;
 import software.amazon.awssdk.services.iot.model.DescribeSecurityProfileRequest;
-import software.amazon.awssdk.services.iot.model.IotException;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
+import software.amazon.cloudformation.proxy.HandlerErrorCode;
 import software.amazon.cloudformation.proxy.Logger;
+import software.amazon.cloudformation.proxy.OperationStatus;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
@@ -35,11 +36,17 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                 .build();
         try {
             proxy.injectCredentialsAndInvokeV2(describeRequest, iotClient::describeSecurityProfile);
-        } catch (IotException e) {
+        } catch (Exception e) {
             // If the resource doesn't exist, DescribeSecurityProfile will throw NotFoundException,
-            // which we'll rethrow as CfnNotFoundException - that's all we need to do.
-            // CFN (the caller) will swallow this NotFound exception and the customer will see success.
-            throw Translator.translateIotExceptionToCfn(e);
+            // and we'll return FAILED with HandlerErrorCode.NotFound.
+            // CFN (the caller) will swallow the "failure" and the customer will see success.
+            HandlerErrorCode errorCode = Translator.translateIotExceptionToCfnErrorCode(e, logger);
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .resourceModel(model)
+                    .status(OperationStatus.FAILED)
+                    .errorCode(errorCode)
+                    .message(e.getMessage())
+                    .build();
         }
         logger.log(String.format("Called Describe for %s with name %s, accountId %s.",
                 ResourceModel.TYPE_NAME, model.getSecurityProfileName(), request.getAwsAccountId()));
@@ -49,8 +56,14 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                 .build();
         try {
             proxy.injectCredentialsAndInvokeV2(deleteRequest, iotClient::deleteSecurityProfile);
-        } catch (IotException e) {
-            throw Translator.translateIotExceptionToCfn(e);
+        } catch (Exception e) {
+            HandlerErrorCode errorCode = Translator.translateIotExceptionToCfnErrorCode(e, logger);
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .resourceModel(model)
+                    .status(OperationStatus.FAILED)
+                    .errorCode(errorCode)
+                    .message(e.getMessage())
+                    .build();
         }
 
         logger.log(String.format("Deleted %s with name %s, accountId %s.",

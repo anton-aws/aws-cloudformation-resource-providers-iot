@@ -10,10 +10,10 @@ import software.amazon.awssdk.services.iot.IotClient;
 import software.amazon.awssdk.services.iot.model.AttachSecurityProfileRequest;
 import software.amazon.awssdk.services.iot.model.CreateSecurityProfileRequest;
 import software.amazon.awssdk.services.iot.model.CreateSecurityProfileResponse;
-import software.amazon.awssdk.services.iot.model.IotException;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 import software.amazon.cloudformation.proxy.HandlerErrorCode;
 import software.amazon.cloudformation.proxy.Logger;
+import software.amazon.cloudformation.proxy.OperationStatus;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 import software.amazon.cloudformation.resource.IdentifierUtils;
@@ -51,8 +51,14 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         try {
             createResponse = proxy.injectCredentialsAndInvokeV2(
                     createRequest, iotClient::createSecurityProfile);
-        } catch (IotException e) {
-            throw Translator.translateIotExceptionToCfn(e);
+        } catch (Exception e) {
+            HandlerErrorCode errorCode = Translator.translateIotExceptionToCfnErrorCode(e, logger);
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .resourceModel(model)
+                    .status(OperationStatus.FAILED)
+                    .errorCode(errorCode)
+                    .message(e.getMessage())
+                    .build();
         }
 
         model.setSecurityProfileArn(createResponse.securityProfileArn());
@@ -66,7 +72,22 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             RateLimiter rateLimiter = RateLimiter.create(MAX_CALLS_PER_SECOND_LIMIT);
             for (String targetArn : targetArns) {
                 rateLimiter.acquire();
-                attachSecurityProfile(model.getSecurityProfileName(), targetArn, proxy);
+
+                AttachSecurityProfileRequest attachRequest = AttachSecurityProfileRequest.builder()
+                        .securityProfileName(model.getSecurityProfileName())
+                        .securityProfileTargetArn(targetArn)
+                        .build();
+                try {
+                    proxy.injectCredentialsAndInvokeV2(attachRequest, iotClient::attachSecurityProfile);
+                } catch (Exception e) {
+                    HandlerErrorCode errorCode = Translator.translateIotExceptionToCfnErrorCode(e, logger);
+                    return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                            .resourceModel(model)
+                            .status(OperationStatus.FAILED)
+                            .errorCode(errorCode)
+                            .message(e.getMessage())
+                            .build();
+                }
                 logger.log("Attached the security profile to " + targetArn);
             }
         }
@@ -106,20 +127,5 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                         model.getAdditionalMetricsToRetainV2()))
                 .tags(Translator.translateTagsFromCfnToIot(tags))
                 .build();
-    }
-
-    private void attachSecurityProfile(String securityProfileName,
-                                       String targetArn,
-                                       AmazonWebServicesClientProxy proxy) {
-
-        AttachSecurityProfileRequest attachRequest = AttachSecurityProfileRequest.builder()
-                .securityProfileName(securityProfileName)
-                .securityProfileTargetArn(targetArn)
-                .build();
-        try {
-            proxy.injectCredentialsAndInvokeV2(attachRequest, iotClient::attachSecurityProfile);
-        } catch (IotException e) {
-            throw Translator.translateIotExceptionToCfn(e);
-        }
     }
 }

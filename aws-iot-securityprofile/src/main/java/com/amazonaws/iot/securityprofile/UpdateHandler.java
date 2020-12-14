@@ -21,9 +21,11 @@ import software.amazon.awssdk.services.iot.model.UpdateSecurityProfileRequest;
 import software.amazon.awssdk.services.iot.model.UpdateSecurityProfileResponse;
 import software.amazon.awssdk.utils.CollectionUtils;
 import software.amazon.awssdk.utils.StringUtils;
+import software.amazon.cloudformation.exceptions.BaseHandlerException;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 import software.amazon.cloudformation.proxy.HandlerErrorCode;
 import software.amazon.cloudformation.proxy.Logger;
+import software.amazon.cloudformation.proxy.OperationStatus;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
@@ -55,10 +57,30 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         String securityProfileArn = updateSecurityProfile(proxy, desiredModel, logger);
 
         // Security profile targets are managed by separate APIs, not UpdateSecurityProfile.
-        updateTargetAttachments(proxy, desiredModel, logger);
+        try {
+            updateTargetAttachments(proxy, desiredModel, logger);
+        } catch (Exception e) {
+            HandlerErrorCode errorCode = Translator.translateIotExceptionToCfnErrorCode(e, logger);
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .resourceModel(desiredModel)
+                    .status(OperationStatus.FAILED)
+                    .errorCode(errorCode)
+                    .message(e.getMessage())
+                    .build();
+        }
 
         // Same for tags.
-        updateTags(proxy, request, securityProfileArn, logger);
+        try {
+            updateTags(proxy, request, securityProfileArn, logger);
+        } catch (Exception e) {
+            HandlerErrorCode errorCode = Translator.translateIotExceptionToCfnErrorCode(e, logger);
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .resourceModel(desiredModel)
+                    .status(OperationStatus.FAILED)
+                    .errorCode(errorCode)
+                    .message(e.getMessage())
+                    .build();
+        }
 
         desiredModel.setSecurityProfileArn(securityProfileArn);
         return ProgressEvent.defaultSuccessHandler(desiredModel);
@@ -117,13 +139,8 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 .deleteAdditionalMetricsToRetain(deleteAdditionalMetricsToRetain)
                 .build();
 
-        UpdateSecurityProfileResponse updateResponse;
-        try {
-            updateResponse = proxy.injectCredentialsAndInvokeV2(
-                    updateRequest, iotClient::updateSecurityProfile);
-        } catch (IotException e) {
-            throw Translator.translateIotExceptionToCfn(e);
-        }
+        UpdateSecurityProfileResponse updateResponse = proxy.injectCredentialsAndInvokeV2(
+                updateRequest, iotClient::updateSecurityProfile);
         String arn = updateResponse.securityProfileArn();
         logger.log("Called UpdateSecurityProfile for " + arn);
         return arn;
@@ -162,11 +179,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                     .securityProfileName(securityProfileName)
                     .securityProfileTargetArn(targetArn)
                     .build();
-            try {
-                proxy.injectCredentialsAndInvokeV2(attachRequest, iotClient::attachSecurityProfile);
-            } catch (IotException e) {
-                throw Translator.translateIotExceptionToCfn(e);
-            }
+            proxy.injectCredentialsAndInvokeV2(attachRequest, iotClient::attachSecurityProfile);
             logger.log("Attached " + securityProfileName + " to " + targetArn);
         }
 
@@ -176,11 +189,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                     .securityProfileName(securityProfileName)
                     .securityProfileTargetArn(targetArn)
                     .build();
-            try {
-                proxy.injectCredentialsAndInvokeV2(detachRequest, iotClient::detachSecurityProfile);
-            } catch (IotException e) {
-                throw Translator.translateIotExceptionToCfn(e);
-            }
+            proxy.injectCredentialsAndInvokeV2(detachRequest, iotClient::detachSecurityProfile);
             logger.log("Detached " + securityProfileName + " from " + targetArn);
         }
     }
@@ -221,11 +230,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                     .resourceArn(resourceArn)
                     .tags(tagsToAttach)
                     .build();
-            try {
-                proxy.injectCredentialsAndInvokeV2(tagResourceRequest, iotClient::tagResource);
-            } catch (IotException e) {
-                throw Translator.translateIotExceptionToCfn(e);
-            }
+            proxy.injectCredentialsAndInvokeV2(tagResourceRequest, iotClient::tagResource);
             logger.log("Called TagResource for " + resourceArn);
         }
 
@@ -234,11 +239,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                     .resourceArn(resourceArn)
                     .tagKeys(tagKeysToDetach)
                     .build();
-            try {
-                proxy.injectCredentialsAndInvokeV2(untagResourceRequest, iotClient::untagResource);
-            } catch (IotException e) {
-                throw Translator.translateIotExceptionToCfn(e);
-            }
+            proxy.injectCredentialsAndInvokeV2(untagResourceRequest, iotClient::untagResource);
             logger.log("Called UntagResource for " + resourceArn);
         }
     }
