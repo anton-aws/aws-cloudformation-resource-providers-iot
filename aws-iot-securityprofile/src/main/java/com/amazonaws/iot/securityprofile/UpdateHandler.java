@@ -12,7 +12,6 @@ import com.google.common.util.concurrent.RateLimiter;
 import software.amazon.awssdk.services.iot.IotClient;
 import software.amazon.awssdk.services.iot.model.AttachSecurityProfileRequest;
 import software.amazon.awssdk.services.iot.model.DetachSecurityProfileRequest;
-import software.amazon.awssdk.services.iot.model.IotException;
 import software.amazon.awssdk.services.iot.model.MetricToRetain;
 import software.amazon.awssdk.services.iot.model.Tag;
 import software.amazon.awssdk.services.iot.model.TagResourceRequest;
@@ -21,7 +20,6 @@ import software.amazon.awssdk.services.iot.model.UpdateSecurityProfileRequest;
 import software.amazon.awssdk.services.iot.model.UpdateSecurityProfileResponse;
 import software.amazon.awssdk.utils.CollectionUtils;
 import software.amazon.awssdk.utils.StringUtils;
-import software.amazon.cloudformation.exceptions.BaseHandlerException;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 import software.amazon.cloudformation.proxy.HandlerErrorCode;
 import software.amazon.cloudformation.proxy.Logger;
@@ -60,26 +58,14 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         try {
             updateTargetAttachments(proxy, desiredModel, logger);
         } catch (Exception e) {
-            HandlerErrorCode errorCode = Translator.translateIotExceptionToCfnErrorCode(e, logger);
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .resourceModel(desiredModel)
-                    .status(OperationStatus.FAILED)
-                    .errorCode(errorCode)
-                    .message(e.getMessage())
-                    .build();
+            return Translator.translateExceptionToErrorCode(desiredModel, e, logger);
         }
 
         // Same for tags.
         try {
             updateTags(proxy, request, securityProfileArn, logger);
         } catch (Exception e) {
-            HandlerErrorCode errorCode = Translator.translateIotExceptionToCfnErrorCode(e, logger);
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .resourceModel(desiredModel)
-                    .status(OperationStatus.FAILED)
-                    .errorCode(errorCode)
-                    .message(e.getMessage())
-                    .build();
+            return Translator.translateExceptionToErrorCode(desiredModel, e, logger);
         }
 
         desiredModel.setSecurityProfileArn(securityProfileArn);

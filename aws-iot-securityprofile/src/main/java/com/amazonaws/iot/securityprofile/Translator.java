@@ -6,9 +6,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.amazonaws.AmazonServiceException;
-import com.google.common.collect.ImmutableSet;
-
 import lombok.NonNull;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import software.amazon.awssdk.services.iot.model.InternalFailureException;
@@ -30,6 +27,8 @@ import software.amazon.cloudformation.exceptions.CfnServiceLimitExceededExceptio
 import software.amazon.cloudformation.exceptions.CfnThrottlingException;
 import software.amazon.cloudformation.proxy.HandlerErrorCode;
 import software.amazon.cloudformation.proxy.Logger;
+import software.amazon.cloudformation.proxy.OperationStatus;
+import software.amazon.cloudformation.proxy.ProgressEvent;
 
 public class Translator {
 
@@ -330,7 +329,23 @@ public class Translator {
         }
     }
 
-    static HandlerErrorCode translateIotExceptionToCfnErrorCode(Exception e, Logger logger) {
+    static ProgressEvent<ResourceModel, CallbackContext> translateExceptionToErrorCode(
+            ResourceModel model, Exception e, Logger logger) {
+
+        HandlerErrorCode errorCode = translateExceptionToErrorCode(e, logger);
+        ProgressEvent<ResourceModel, CallbackContext> progressEvent =
+                ProgressEvent.<ResourceModel, CallbackContext>builder()
+                        .resourceModel(model)
+                        .status(OperationStatus.FAILED)
+                        .errorCode(errorCode)
+                        .build();
+        if (errorCode != HandlerErrorCode.InternalFailure) {
+            progressEvent.setMessage(e.getMessage());
+        }
+        return progressEvent;
+    }
+
+    static HandlerErrorCode translateExceptionToErrorCode(Exception e, Logger logger) {
 
         logger.log(String.format("Translating exception \"%s\", stack trace: %s",
                 e.getMessage(), ExceptionUtils.getStackTrace(e)));
