@@ -4,7 +4,6 @@ import software.amazon.awssdk.services.iot.IotClient;
 import software.amazon.awssdk.services.iot.model.DeleteAccountAuditConfigurationRequest;
 import software.amazon.awssdk.services.iot.model.DescribeAccountAuditConfigurationRequest;
 import software.amazon.awssdk.services.iot.model.DescribeAccountAuditConfigurationResponse;
-import software.amazon.awssdk.services.iot.model.IotException;
 import software.amazon.awssdk.utils.StringUtils;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 import software.amazon.cloudformation.proxy.HandlerErrorCode;
@@ -27,7 +26,15 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             CallbackContext callbackContext,
             Logger logger) {
 
+        ResourceModel model = request.getDesiredResourceState();
+
+        String accountIdFromTemplate = model.getAccountId();
         String accountId = request.getAwsAccountId();
+        if (!accountIdFromTemplate.equals(accountId)) {
+            return ProgressEvent.failed(model, callbackContext, HandlerErrorCode.InvalidRequest,
+                    String.format("AccountId in the template (%s) doesn't match actual: %s.",
+                            accountIdFromTemplate, accountId));
+        }
 
         // Call Describe to see whether the configuration was already deleted, as that's
         // what the CFN contracts advise.
@@ -39,8 +46,8 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             describeResponse = proxy.injectCredentialsAndInvokeV2(
                     DescribeAccountAuditConfigurationRequest.builder().build(),
                     iotClient::describeAccountAuditConfiguration);
-        } catch (IotException e) {
-            throw Translator.translateIotExceptionToCfn(e);
+        } catch (Exception e) {
+            return Translator.translateExceptionToProgressEvent(model, e, logger);
         }
         logger.log("Called DescribeAccountAuditConfiguration for " + accountId);
 
@@ -49,7 +56,7 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
         // unless the whole configuration is deleted.
         if (StringUtils.isEmpty(describeResponse.roleArn())) {
             // CFN swallows this NotFound failure, the customer will see success.
-            return ProgressEvent.failed(request.getDesiredResourceState(), callbackContext,
+            return ProgressEvent.failed(model, callbackContext,
                     HandlerErrorCode.NotFound,
                     "The configuration for your account has not been set up or was deleted.");
         }
@@ -58,8 +65,8 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             proxy.injectCredentialsAndInvokeV2(
                     DeleteAccountAuditConfigurationRequest.builder().build(),
                     iotClient::deleteAccountAuditConfiguration);
-        } catch (IotException e) {
-            throw Translator.translateIotExceptionToCfn(e);
+        } catch (Exception e) {
+            return Translator.translateExceptionToProgressEvent(model, e, logger);
         }
 
         logger.log("Deleted AccountAuditConfiguration for " + accountId);

@@ -9,7 +9,6 @@ import software.amazon.awssdk.services.iot.model.AuditNotificationTarget;
 import software.amazon.awssdk.services.iot.model.AuditNotificationType;
 import software.amazon.awssdk.services.iot.model.DescribeAccountAuditConfigurationRequest;
 import software.amazon.awssdk.services.iot.model.DescribeAccountAuditConfigurationResponse;
-import software.amazon.awssdk.services.iot.model.IotException;
 import software.amazon.awssdk.services.iot.model.UpdateAccountAuditConfigurationRequest;
 import software.amazon.awssdk.utils.StringUtils;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
@@ -48,8 +47,8 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             describeResponse = proxy.injectCredentialsAndInvokeV2(
                     DescribeAccountAuditConfigurationRequest.builder().build(),
                     iotClient::describeAccountAuditConfiguration);
-        } catch (IotException e) {
-            throw Translator.translateIotExceptionToCfn(e);
+        } catch (Exception e) {
+            return Translator.translateExceptionToProgressEvent(model, e, logger);
         }
         logger.log(String.format("Called DescribeAccountAuditConfiguration for %s.", accountId));
 
@@ -74,8 +73,8 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         try {
             proxy.injectCredentialsAndInvokeV2(
                     updateRequest, iotClient::updateAccountAuditConfiguration);
-        } catch (IotException e) {
-            throw Translator.translateIotExceptionToCfn(e);
+        } catch (Exception e) {
+            return Translator.translateExceptionToProgressEvent(model, e, logger);
         }
 
         logger.log(String.format("Updated AccountAuditConfiguration for %s.", accountId));
