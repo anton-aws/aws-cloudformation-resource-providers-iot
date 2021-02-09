@@ -1,14 +1,47 @@
 {
   "AccountId": "{{AccountId}}",
   "AuditCheckConfigurations": {
-    "LOGGING_DISABLED_CHECK": {
-      "Enabled": true
+    "AUTHENTICATED_COGNITO_ROLE_OVERLY_PERMISSIVE_CHECK": {
+      "Enabled": false
     },
     "CA_CERTIFICATE_EXPIRING_CHECK": {
+      "Enabled": false
+    },
+    "CA_CERTIFICATE_KEY_QUALITY_CHECK": {
+      "Enabled": false
+    },
+    "CONFLICTING_CLIENT_IDS_CHECK": {
       "Enabled": true
     },
     "DEVICE_CERTIFICATE_EXPIRING_CHECK": {
       "Enabled": true
+    },
+    "DEVICE_CERTIFICATE_KEY_QUALITY_CHECK": {
+      "Enabled": false
+    },
+    "DEVICE_CERTIFICATE_SHARED_CHECK": {
+      "Enabled": false
+    },
+    "IOT_POLICY_OVERLY_PERMISSIVE_CHECK": {
+      "Enabled": false
+    },
+    "IOT_ROLE_ALIAS_ALLOWS_ACCESS_TO_UNUSED_SERVICES_CHECK": {
+      "Enabled": false
+    },
+    "IOT_ROLE_ALIAS_OVERLY_PERMISSIVE_CHECK": {
+      "Enabled": false
+    },
+    "LOGGING_DISABLED_CHECK": {
+      "Enabled": true
+    },
+    "REVOKED_CA_CERTIFICATE_STILL_ACTIVE_CHECK": {
+      "Enabled": false
+    },
+    "REVOKED_DEVICE_CERTIFICATE_STILL_ACTIVE_CHECK": {
+      "Enabled": false
+    },
+    "UNAUTHENTICATED_COGNITO_ROLE_OVERLY_PERMISSIVE_CHECK": {
+      "Enabled": false
     }
   },
   "RoleArn": "{{RoleForDeviceDefenderAuditArn}}"
